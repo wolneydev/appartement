@@ -1,25 +1,20 @@
-import { useState } from 'react'
-import './App.css'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Home from './pages/Home';
+import ApartmentDetails from './pages/ApartmentDetails';
+import Compare from './pages/Compare';
+import './App.css';
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <div className="App">
-      <header className="App-header">
-        <h1>Appartement</h1>
-        <div className="card">
-          <button onClick={() => setCount((count) => count + 1)}>
-            Contador: {count}
-          </button>
-          <p>
-            Edite <code>src/App.jsx</code> e salve para testar o HMR
-          </p>
-        </div>
-      </header>
-    </div>
-  )
+    <Router>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/apartment/:id" element={<ApartmentDetails />} />
+        <Route path="/compare" element={<Compare />} />
+      </Routes>
+    </Router>
+  );
 }
 
-export default App
+export default App;
 
