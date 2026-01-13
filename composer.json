@@ -1,0 +1,27 @@
+{
+    "name": "appartement/backend",
+    "description": "Backend API for Appartement",
+    "type": "project",
+    "require": {
+        "php": "^8.3",
+        "symfony/clock": "^7.0",
+        "symfony/css-selector": "^7.0",
+        "symfony/event-dispatcher": "^7.0",
+        "symfony/string": "^7.0",
+        "symfony/translation": "^7.0",
+        "nesbot/carbon": "^3.0"
+    },
+    "config": {
+        "platform": {
+            "php": "8.3"
+        },
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
+

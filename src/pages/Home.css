@@ -46,6 +46,21 @@
   gap: 1rem;
 }
 
+.register-property-btn {
+  padding: 0.75rem 1.5rem;
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.register-property-btn:hover {
+  background-color: #1d4ed8;
+}
+
 .compare-toggle-btn {
   padding: 0.75rem 1.5rem;
   border: 2px solid #22c55e;
@@ -149,6 +164,29 @@
 .page-dots {
   color: #6b7280;
   padding: 0 0.5rem;
+}
+
+.home-loading,
+.home-error,
+.home-empty {
+  padding: 3rem;
+  text-align: center;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.home-loading {
+  color: #6b7280;
+}
+
+.home-error {
+  color: #dc2626;
+  background-color: #fee2e2;
+}
+
+.home-empty {
+  color: #6b7280;
 }
 
 @media (max-width: 1200px) {

@@ -1,7 +1,16 @@
 import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import './ApartmentCard.css';
 
 function ApartmentCard({ apartment, onSelect, isSelected, showCompare }) {
+  const navigate = useNavigate();
+
+  const handleEdit = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(`/property-registration/${apartment.id}`);
+  };
+
   return (
     <div className={`apartment-card ${isSelected ? 'selected' : ''}`}>
       <div className="card-image-container">
@@ -18,6 +27,13 @@ function ApartmentCard({ apartment, onSelect, isSelected, showCompare }) {
         <div className="card-score">
           {apartment.score} SCORE TOTAL
         </div>
+        <button 
+          className="card-edit-btn"
+          onClick={handleEdit}
+          title="Editar imóvel"
+        >
+          ✏️
+        </button>
         {showCompare && (
           <div className="card-checkbox">
             <input
