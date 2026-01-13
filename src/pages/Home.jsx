@@ -73,7 +73,8 @@ const convertApiDataToApartment = (apiProperty) => {
     },
     description: apiProperty.title || '',
     address: apiProperty.address || '',
-    propertyType: apiProperty.property_type || 'apartamento'
+    propertyType: apiProperty.property_type || 'apartamento',
+    isForRent: apiProperty.is_for_rent || false
   };
   
   console.log('Converted property:', converted); // Debug
@@ -96,6 +97,7 @@ function Home() {
   const [sortBy, setSortBy] = useState('score');
   const [selectedApartments, setSelectedApartments] = useState([]);
   const [showCompare, setShowCompare] = useState(false);
+  const [activeTab, setActiveTab] = useState('compra'); // 'aluguel' ou 'compra'
 
   // Buscar dados da API
   useEffect(() => {
@@ -146,12 +148,23 @@ function Home() {
   const filteredAndSorted = useMemo(() => {
     console.log('Apartments before filter:', apartments); // Debug
     console.log('Filters:', filters); // Debug
-    const filtered = filterApartments(apartments, filters);
+    console.log('Active tab:', activeTab); // Debug
+    
+    // Filtrar por tipo de transação primeiro
+    const filteredByTransaction = apartments.filter(apt => {
+      if (activeTab === 'aluguel') {
+        return apt.isForRent === true;
+      } else {
+        return apt.isForRent === false || apt.isForRent === undefined;
+      }
+    });
+    
+    const filtered = filterApartments(filteredByTransaction, filters);
     console.log('Filtered apartments:', filtered); // Debug
     const sorted = sortApartments(filtered, sortBy);
     console.log('Sorted apartments:', sorted); // Debug
     return sorted;
-  }, [apartments, filters, sortBy]);
+  }, [apartments, filters, sortBy, activeTab]);
 
   const handleSelectApartment = (id) => {
     setSelectedApartments(prev => {
@@ -184,7 +197,9 @@ function Home() {
         <div className="home-main">
           <div className="home-header">
             <div>
-              <h1 className="home-title">Apartamentos em São Paulo</h1>
+              <h1 className="home-title">
+                Imóveis para {activeTab === 'aluguel' ? 'Aluguel' : 'Compra'} em São Paulo
+              </h1>
               <p className="home-subtitle">
                 {filteredAndSorted.length} imóveis encontrados seguindo seus critérios
               </p>
@@ -211,6 +226,20 @@ function Home() {
                 </button>
               )}
             </div>
+          </div>
+          <div className="home-tabs">
+            <button
+              className={`home-tab ${activeTab === 'compra' ? 'active' : ''}`}
+              onClick={() => setActiveTab('compra')}
+            >
+              Compra
+            </button>
+            <button
+              className={`home-tab ${activeTab === 'aluguel' ? 'active' : ''}`}
+              onClick={() => setActiveTab('aluguel')}
+            >
+              Aluguel
+            </button>
           </div>
           <div className="sort-section">
             <span className="sort-label">Ordenar por:</span>

@@ -41,6 +41,43 @@
   font-size: 0.875rem;
 }
 
+.home-tabs {
+  display: flex;
+  gap: 0.5rem;
+  background: white;
+  padding: 0.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  margin-bottom: 1rem;
+}
+
+.home-tab {
+  flex: 1;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-weight: 500;
+  font-size: 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.home-tab:hover {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.home-tab.active {
+  background-color: #2563eb;
+  color: white;
+}
+
+.home-tab.active:hover {
+  background-color: #1d4ed8;
+}
+
 .home-actions {
   display: flex;
   gap: 1rem;

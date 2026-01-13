@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { propertiesAPI } from '../services/api';
+import { propertiesAPI, nearbyItemsAPI } from '../services/api';
 import './PropertyRegistration.css';
 
 // Função para converter tipo da API para o formato do formulário
@@ -50,12 +50,36 @@ function PropertyRegistration() {
     longitude: null,
     photos: []
   });
-  const [amenities, setAmenities] = useState([
-    { id: 1, name: 'Padaria Delícia', distance: '120m', checked: true },
-    { id: 2, name: 'Smart Fit - Unidade X', distance: '350m', checked: true },
-    { id: 3, name: 'Parada Brigadeiro', distance: '50m', checked: true },
-    { id: 4, name: 'Farmácia Popular', distance: 'Sugerido pelo sistema', checked: false }
-  ]);
+  const [manualItems, setManualItems] = useState([]);
+  const [availableNearbyItems, setAvailableNearbyItems] = useState([]);
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [loadingNearbyItems, setLoadingNearbyItems] = useState(false);
+  const [currentPropertyId, setCurrentPropertyId] = useState(id || null);
+  const [newItemForm, setNewItemForm] = useState({
+    nearby_item_id: '',
+    distance_meters: '',
+    walking_time_minutes: '',
+    driving_time_minutes: ''
+  });
+
+  // Carregar lista de nearby items disponíveis
+  useEffect(() => {
+    const loadNearbyItems = async () => {
+      setLoadingNearbyItems(true);
+      try {
+        const response = await nearbyItemsAPI.getAll();
+        const items = (response.success && response.data) ? response.data : (response.data || []);
+        setAvailableNearbyItems(items);
+      } catch (err) {
+        console.error('Erro ao carregar nearby items:', err);
+        setError('Erro ao carregar lista de itens. ' + (err.message || ''));
+      } finally {
+        setLoadingNearbyItems(false);
+      }
+    };
+
+    loadNearbyItems();
+  }, []);
 
   // Carregar dados existentes se estiver editando
   useEffect(() => {
@@ -91,6 +115,7 @@ function PropertyRegistration() {
               file: null
             }] : []
           });
+          setCurrentPropertyId(id);
         } catch (err) {
           console.error('Erro ao carregar propriedade:', err);
           setError('Erro ao carregar dados do imóvel. ' + (err.message || ''));
@@ -102,6 +127,44 @@ function PropertyRegistration() {
       loadPropertyData();
     }
   }, [id, isEditMode]);
+
+  // Carregar itens próximos quando a propriedade e os itens disponíveis estiverem carregados
+  useEffect(() => {
+    if (isEditMode && currentPropertyId && availableNearbyItems.length > 0) {
+      const loadPropertyNearbyItems = async () => {
+        try {
+          const nearbyItemsResponse = await nearbyItemsAPI.getByPropertyId(currentPropertyId);
+          const nearbyItems = (nearbyItemsResponse.success && nearbyItemsResponse.data) 
+            ? nearbyItemsResponse.data 
+            : (nearbyItemsResponse.data || []);
+          
+          // Mapear os itens para o formato esperado
+          const mappedItems = nearbyItems.map(item => {
+            // Buscar o nome do item na lista de itens disponíveis
+            const availableItem = availableNearbyItems.find(ai => ai.id === item.nearby_item_id);
+            return {
+              id: item.id,
+              nearby_item_id: item.nearby_item_id,
+              name: availableItem?.name || 'Item',
+              name_en: availableItem?.name_en || null,
+              name_item: item.name_item || null,
+              distance_meters: item.distance_meters || null,
+              walking_time_minutes: item.walking_time_minutes || null,
+              driving_time_minutes: item.driving_time_minutes || null,
+              saved: true
+            };
+          });
+          
+          setManualItems(mappedItems);
+        } catch (nearbyErr) {
+          console.error('Erro ao carregar itens próximos:', nearbyErr);
+          // Não mostrar erro aqui, apenas logar, pois não é crítico
+        }
+      };
+
+      loadPropertyNearbyItems();
+    }
+  }, [isEditMode, currentPropertyId, availableNearbyItems]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -169,12 +232,105 @@ function PropertyRegistration() {
     }));
   };
 
-  const toggleAmenity = (id) => {
-    setAmenities(prev =>
-      prev.map(amenity =>
-        amenity.id === id ? { ...amenity, checked: !amenity.checked } : amenity
-      )
-    );
+  const handleAddItem = () => {
+    setShowAddItemModal(true);
+    setNewItemForm({
+      nearby_item_id: '',
+      name_item: '',
+      distance_meters: '',
+      walking_time_minutes: '',
+      driving_time_minutes: ''
+    });
+  };
+
+  const handleCloseModal = () => {
+    setShowAddItemModal(false);
+    setNewItemForm({
+      nearby_item_id: '',
+      name_item: '',
+      distance_meters: '',
+      walking_time_minutes: '',
+      driving_time_minutes: ''
+    });
+  };
+
+  const handleNewItemInputChange = (field, value) => {
+    setNewItemForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveNewItem = async () => {
+    if (!newItemForm.nearby_item_id) {
+      setError('Por favor, selecione um item.');
+      return;
+    }
+
+    const selectedItem = availableNearbyItems.find(item => item.id === parseInt(newItemForm.nearby_item_id));
+    if (!selectedItem) {
+      setError('Item selecionado não encontrado.');
+      return;
+    }
+
+    // Se já temos property_id, salvar imediatamente
+    if (currentPropertyId) {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const itemData = {
+          property_id: parseInt(currentPropertyId),
+          nearby_item_id: parseInt(newItemForm.nearby_item_id),
+          ...(newItemForm.name_item && { name_item: newItemForm.name_item }),
+          ...(newItemForm.distance_meters && { distance_meters: parseInt(newItemForm.distance_meters) }),
+          ...(newItemForm.walking_time_minutes && { walking_time_minutes: parseInt(newItemForm.walking_time_minutes) }),
+          ...(newItemForm.driving_time_minutes && { driving_time_minutes: parseInt(newItemForm.driving_time_minutes) })
+        };
+
+        const response = await nearbyItemsAPI.create(itemData);
+        
+        const newItem = {
+          id: response.data?.id || Date.now(),
+          nearby_item_id: selectedItem.id,
+          name: selectedItem.name,
+          name_en: selectedItem.name_en,
+          name_item: newItemForm.name_item || null,
+          distance_meters: newItemForm.distance_meters ? parseInt(newItemForm.distance_meters) : null,
+          walking_time_minutes: newItemForm.walking_time_minutes ? parseInt(newItemForm.walking_time_minutes) : null,
+          driving_time_minutes: newItemForm.driving_time_minutes ? parseInt(newItemForm.driving_time_minutes) : null,
+          saved: true
+        };
+        setManualItems(prev => [...prev, newItem]);
+
+        handleCloseModal();
+        setSuccess('Item adicionado com sucesso!');
+        setTimeout(() => setSuccess(null), 3000);
+      } catch (err) {
+        setError(err.message || 'Erro ao adicionar item. Tente novamente.');
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // Se não temos property_id ainda, adicionar localmente e salvar depois
+      const newItem = {
+        id: Date.now(), // ID temporário
+        nearby_item_id: parseInt(newItemForm.nearby_item_id),
+        name: selectedItem.name,
+        name_en: selectedItem.name_en,
+        name_item: newItemForm.name_item || null,
+        distance_meters: newItemForm.distance_meters ? parseInt(newItemForm.distance_meters) : null,
+        walking_time_minutes: newItemForm.walking_time_minutes ? parseInt(newItemForm.walking_time_minutes) : null,
+        driving_time_minutes: newItemForm.driving_time_minutes ? parseInt(newItemForm.driving_time_minutes) : null,
+        isPending: true
+      };
+      setManualItems(prev => [...prev, newItem]);
+
+      handleCloseModal();
+      setSuccess('Item adicionado! Será salvo quando você salvar o imóvel.');
+      setTimeout(() => setSuccess(null), 3000);
+    }
+  };
+
+  const handleRemoveItem = (itemId) => {
+    setManualItems(prev => prev.filter(item => item.id !== itemId));
   };
 
   const getCoverPhotoUrl = () => {
@@ -185,6 +341,36 @@ function PropertyRegistration() {
       return coverPhoto.preview;
     }
     return null;
+  };
+
+  const saveNearbyItems = async (propertyId) => {
+    if (manualItems.length === 0) return;
+
+    const pendingItems = manualItems.filter(item => item.isPending || !item.saved);
+    if (pendingItems.length === 0) return;
+
+    for (const item of pendingItems) {
+      try {
+        const itemData = {
+          property_id: parseInt(propertyId),
+          nearby_item_id: item.nearby_item_id,
+          ...(item.name_item && { name_item: item.name_item }),
+          ...(item.distance_meters && { distance_meters: item.distance_meters }),
+          ...(item.walking_time_minutes && { walking_time_minutes: item.walking_time_minutes }),
+          ...(item.driving_time_minutes && { driving_time_minutes: item.driving_time_minutes })
+        };
+
+        await nearbyItemsAPI.create(itemData);
+        
+        // Marcar como salvo
+        setManualItems(prev => prev.map(i => 
+          i.id === item.id ? { ...i, isPending: false, saved: true } : i
+        ));
+      } catch (err) {
+        console.error('Erro ao salvar item próximo:', err);
+        // Continuar salvando os outros itens mesmo se um falhar
+      }
+    }
   };
 
   const handleSaveDraft = async () => {
@@ -208,12 +394,23 @@ function PropertyRegistration() {
 
       console.log('Dados sendo enviados (rascunho):', dataToSend); // Debug
 
+      let savedPropertyId = currentPropertyId;
       if (isEditMode) {
         await propertiesAPI.update(id, dataToSend);
+        savedPropertyId = id;
         setSuccess('Rascunho atualizado com sucesso!');
       } else {
-        await propertiesAPI.create(dataToSend);
+        const response = await propertiesAPI.create(dataToSend);
+        // Extrair o ID do imóvel criado
+        const createdProperty = (response.success && response.data) ? response.data : (response.data || response);
+        savedPropertyId = createdProperty.id || createdProperty.property_id;
+        setCurrentPropertyId(savedPropertyId);
         setSuccess('Rascunho salvo com sucesso!');
+      }
+
+      // Salvar itens próximos se houver
+      if (savedPropertyId && manualItems.length > 0) {
+        await saveNearbyItems(savedPropertyId);
       }
       
       setTimeout(() => {
@@ -254,12 +451,23 @@ function PropertyRegistration() {
 
       console.log('Dados sendo enviados (publicar):', dataToSend); // Debug
 
+      let savedPropertyId = currentPropertyId;
       if (isEditMode) {
         await propertiesAPI.update(id, dataToSend);
+        savedPropertyId = id;
         setSuccess('Imóvel atualizado e publicado com sucesso!');
       } else {
-        await propertiesAPI.create(dataToSend);
+        const response = await propertiesAPI.create(dataToSend);
+        // Extrair o ID do imóvel criado
+        const createdProperty = (response.success && response.data) ? response.data : (response.data || response);
+        savedPropertyId = createdProperty.id || createdProperty.property_id;
+        setCurrentPropertyId(savedPropertyId);
         setSuccess('Imóvel publicado com sucesso!');
+      }
+
+      // Salvar itens próximos se houver
+      if (savedPropertyId && manualItems.length > 0) {
+        await saveNearbyItems(savedPropertyId);
       }
       
       setTimeout(() => {
@@ -636,28 +844,45 @@ function PropertyRegistration() {
             </div>
 
             <div className="pr-amenities-section">
-              <h3 className="pr-amenities-title">ITENS DETECTADOS PELO SISTEMA</h3>
+              <h3 className="pr-amenities-title">ITENS PRÓXIMOS</h3>
               <p className="pr-amenities-description">
-                Confirme as comodidades em um raio de 500m para validar sua pontuação.
+                Adicione itens próximos ao imóvel para melhorar a pontuação de conveniência.
               </p>
-              <div className="pr-amenities-list">
-                {amenities.map((amenity) => (
-                  <div key={amenity.id} className="pr-amenity-item">
-                    <input
-                      type="checkbox"
-                      id={`amenity-${amenity.id}`}
-                      checked={amenity.checked}
-                      onChange={() => toggleAmenity(amenity.id)}
-                      className="pr-amenity-checkbox"
-                    />
-                    <label htmlFor={`amenity-${amenity.id}`} className="pr-amenity-label">
-                      <span className="pr-amenity-name">{amenity.name}</span>
-                      <span className="pr-amenity-distance">{amenity.distance}</span>
-                    </label>
-                  </div>
-                ))}
-              </div>
-              <button className="pr-add-manual-btn">
+              {manualItems.length > 0 ? (
+                <div className="pr-amenities-list">
+                  {manualItems.map((item) => (
+                    <div key={item.id} className="pr-amenity-item">
+                      <div className="pr-amenity-label">
+                        <span className="pr-amenity-name">
+                          {item.name}
+                          {item.name_item && ` - ${item.name_item}`}
+                        </span>
+                        <div className="pr-amenity-details">
+                          {item.distance_meters && (
+                            <span className="pr-amenity-distance">Distância: {item.distance_meters}m</span>
+                          )}
+                          {item.walking_time_minutes && (
+                            <span className="pr-amenity-distance">A pé: {item.walking_time_minutes}min</span>
+                          )}
+                          {item.driving_time_minutes && (
+                            <span className="pr-amenity-distance">De carro: {item.driving_time_minutes}min</span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        className="pr-remove-item-btn"
+                        onClick={() => handleRemoveItem(item.id)}
+                        title="Remover item"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="pr-empty-items">Nenhum item adicionado ainda.</p>
+              )}
+              <button className="pr-add-manual-btn" onClick={handleAddItem}>
                 <span>+</span> Adicionar item manualmente
               </button>
             </div>
@@ -683,6 +908,105 @@ function PropertyRegistration() {
         </>
         )}
       </div>
+
+      {/* Modal para adicionar item manualmente */}
+      {showAddItemModal && (
+        <div className="pr-modal-overlay">
+          <div className="pr-modal-content">
+            <div className="pr-modal-header">
+              <h3 className="pr-modal-title">Adicionar Item Próximo</h3>
+              <button className="pr-modal-close" onClick={handleCloseModal}>×</button>
+            </div>
+            <div className="pr-modal-body">
+              <div className="pr-form-group">
+                <label className="pr-label">Item</label>
+                <select
+                  className="pr-select"
+                  value={newItemForm.nearby_item_id}
+                  onChange={(e) => handleNewItemInputChange('nearby_item_id', e.target.value)}
+                  disabled={loadingNearbyItems}
+                >
+                  <option value="">Selecione um item</option>
+                  {availableNearbyItems.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} {item.name_en && `(${item.name_en})`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="pr-form-group">
+                <label className="pr-label">
+                  Nome do Item
+                  <span className="pr-optional">OPCIONAL</span>
+                </label>
+                <input
+                  type="text"
+                  className="pr-input"
+                  placeholder="Ex: Padaria do João"
+                  value={newItemForm.name_item}
+                  onChange={(e) => handleNewItemInputChange('name_item', e.target.value)}
+                />
+              </div>
+
+              <div className="pr-form-grid">
+                <div className="pr-form-group">
+                  <label className="pr-label">
+                    Distância (metros)
+                    <span className="pr-optional">OPCIONAL</span>
+                  </label>
+                  <input
+                    type="number"
+                    className="pr-input"
+                    placeholder="Ex: 500"
+                    value={newItemForm.distance_meters}
+                    onChange={(e) => handleNewItemInputChange('distance_meters', e.target.value)}
+                    min="0"
+                  />
+                </div>
+
+                <div className="pr-form-group">
+                  <label className="pr-label">
+                    Tempo a pé (minutos)
+                    <span className="pr-optional">OPCIONAL</span>
+                  </label>
+                  <input
+                    type="number"
+                    className="pr-input"
+                    placeholder="Ex: 6"
+                    value={newItemForm.walking_time_minutes}
+                    onChange={(e) => handleNewItemInputChange('walking_time_minutes', e.target.value)}
+                    min="0"
+                  />
+                </div>
+
+                <div className="pr-form-group">
+                  <label className="pr-label">
+                    Tempo de carro (minutos)
+                    <span className="pr-optional">OPCIONAL</span>
+                  </label>
+                  <input
+                    type="number"
+                    className="pr-input"
+                    placeholder="Ex: 2"
+                    value={newItemForm.driving_time_minutes}
+                    onChange={(e) => handleNewItemInputChange('driving_time_minutes', e.target.value)}
+                    min="0"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="pr-modal-footer">
+              <button className="pr-btn-secondary" onClick={handleCloseModal}>
+                Cancelar
+              </button>
+              <button className="pr-btn-primary" onClick={handleSaveNewItem} disabled={loading}>
+                {loading ? 'Salvando...' : 'Adicionar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

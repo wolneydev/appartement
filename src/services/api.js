@@ -197,7 +197,29 @@ export const propertiesAPI = {
   },
 };
 
+// API de Nearby Items
+export const nearbyItemsAPI = {
+  // Buscar todos os nearby items disponíveis
+  getAll: async () => {
+    return fetchAPI('/api/nearby-items');
+  },
+
+  // Buscar property-nearby-items por property_id
+  getByPropertyId: async (propertyId) => {
+    return fetchAPI(`/api/property-nearby-items?property_id=${propertyId}`);
+  },
+
+  // Criar property-nearby-item
+  create: async (data) => {
+    return fetchAPI('/api/property-nearby-items', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+};
+
 export default {
   properties: propertiesAPI,
+  nearbyItems: nearbyItemsAPI,
 };
 
